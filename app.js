@@ -6,13 +6,17 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var mojang = require('mojang-api')
 var NodeCache = require('node-cache')
+domain = require('domain');
 
 var app = express();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
-
+d = domain.create();
+d.on('error', function(err) {
+  console.error(err);
+});
 // uncomment after placing your favicon in /public
 //app.use(favicon(__dirname + '/public/favicon.ico'));
 app.use(logger('dev'));
@@ -22,46 +26,67 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 var uuidcache = new NodeCache( { stdTTL: 3600, checkperiod: 60 } );
+var namecache = new NodeCache( { stdTTL: 3600, checkperiod: 60 } );
+
 uuidcache.on("del", function( key ){
   console.log(key + " uuid has expired, waiting for next login")
 });
 
 
-
-
-function addCache(name, uuid){
-  return uuid;
+function updatecaches(name, uuid){
+  uuidcache.set(name, uuid);
+  namecache.set(uuid, name)
 }
 
-function get(name, cb) {
-  var uuid = uuidcache.get(name, function(err, value){
+function getUUID(name, cb) {
+  uuidcache.get(name, function(err, value){
     if (name in value && !err){
       cb({"name": name, "id": value[name], "cached": true})
     }else{
-      var date = new Date();
-      date.setMonth(0); // 0 = January
-      mojang.uuidAt(name, date, function (err, out) {
+      mojang.uuidAt(name,function (err, out) {
         if (err)
           cb({"name":name, "id": null, "cached": false})
         else {
-          uuidcache.set(name, out.id);
+          updatecaches(out.name, out.id)
           cb({"name":name, "id": out.id, "cached": false})
         }
       });
     }
 
   })
+}
 
+function getName(uuid, cb){
+  namecache.get(uuid, function(err, value){
+    if (uuid in value ){
+      cb({"name": value[uuid], "id": uuid, "cached": true})
+    }else{
+      mojang.profile(uuid, function(err,out){
+        if  (err)
+          cb({"name":null, "id": uuid, "cached": false})
+        else{
+          cb({"name": out.name, "id": uuid, "cached": false})
+          updatecaches(out.name, out.id)
+        }
+      })
+    }
+  });
 }
 
 app.get('/uuid/:username', function(req, res, next) {
-  get(req.params.username, function(out) {
+  getUUID(req.params.username, function(out) {
+    res.json(out);
+  });
+});
+
+app.get('/name/:uuid', function(req, res, next) {
+  getName(req.params.uuid, function(out) {
     res.json(out);
   });
 });
 
 app.get('/', function(req, res, next) {
-    res.json(uuidcache.data)
+    res.json({"uuidcache":{"data":uuidcache.data,"stats":uuidcache.getStats()}, "namecache":{"data":namecache.data,"stats":namecache.getStats()}})
 });
 
 
