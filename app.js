@@ -25,8 +25,8 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-var uuidcache = new NodeCache( { stdTTL: 3600, checkperiod: 60 } );
-var namecache = new NodeCache( { stdTTL: 3600, checkperiod: 60 } );
+var uuidcache = new NodeCache( { stdTTL: 10800, checkperiod: 60 } );
+var namecache = new NodeCache( { stdTTL: 120, checkperiod: 60 } );
 
 uuidcache.on("del", function( key ){
   console.log(key + " uuid has expired, waiting for next login")
@@ -44,8 +44,10 @@ function getUUID(name, cb) {
       cb({"name": name, "id": value[name], "cached": true})
     }else{
       mojang.uuidAt(name,function (err, out) {
-        if (err)
-          cb({"name":name, "id": null, "cached": false})
+        if (err){
+          cb({"name":name, "id": null, "cached": false});
+          uuidcache.set(name, null);
+        }
         else {
           updatecaches(out.name, out.id)
           cb({"name":name, "id": out.id, "cached": false})
