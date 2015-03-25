@@ -6,6 +6,7 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var mojang = require('mojang-api')
 var NodeCache = require('node-cache')
+var md5 = require('MD5')
 domain = require('domain');
 
 var app = express();
@@ -45,8 +46,9 @@ function getUUID(name, cb) {
     }else{
       mojang.uuidAt(name,function (err, out) {
         if (err){
-          cb({"name":name, "id": null, "cached": false});
-          uuidcache.set(name, null);
+          console.log(err)
+          cb({"name":name, "id": md5(name), "cached": false});
+          uuidcache.set(name, md5(name));
         }
         else {
           updatecaches(out.name, out.id)
