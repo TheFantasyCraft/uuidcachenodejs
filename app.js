@@ -93,13 +93,10 @@ app.get('/', function(req, res, next) {
     res.json({"uuidcache":{"data":uuidcache.data,"stats":uuidcache.getStats()}, "namecache":{"data":namecache.data,"stats":namecache.getStats()}})
 });
 
-
-
-
-
-
-
-
+app.get('/clear', function(req, res, next) {
+  uuidcache.flushAll()
+  res.json({"uuidcache":{"data":uuidcache.data,"stats":uuidcache.getStats()}})
+});
 
 
 
