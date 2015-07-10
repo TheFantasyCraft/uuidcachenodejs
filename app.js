@@ -80,13 +80,13 @@ function getTime(){
 
 app.get('/uuid/:username', function(req, res, next) {
   getUUID(req.params.username, function(uuid, cache) {
-    res.json({"name":req.params.username, "uuid":uuid, "cached":cache});
+    res.json({"name":req.params.username, "id":uuid, "cached":cache});
   });
 });
 
 app.get('/name/:uuid', function(req, res, next) {
   getName(req.params.uuid, function(out,cache) {
-    res.json({"name":out, "uuid":req.params.uuid, "cached":cache});
+    res.json({"name":out, "id":req.params.uuid, "cached":cache});
   });
 });
 
