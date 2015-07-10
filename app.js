@@ -1,12 +1,9 @@
 var express = require('express');
 var path = require('path');
-var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var mojang = require('mojang-api')
-var NodeCache = require('node-cache')
-var md5 = require('MD5')
 domain = require('domain');
 
 var app = express();
@@ -26,76 +23,80 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-var uuidcache = new NodeCache( { stdTTL: 10800, checkperiod: 60 } );
-var namecache = new NodeCache( { stdTTL: 120, checkperiod: 60 } );
-
-uuidcache.on("del", function( key ){
-  console.log(key + " uuid has expired, waiting for next login")
-});
-
-
-function updatecaches(name, uuid){
-  uuidcache.set(name, uuid);
-  namecache.set(uuid, name)
-}
+var uuids = {};
 
 function getUUID(name, cb) {
-  uuidcache.get(name, function(err, value){
-    if (name in value && !err){
-      cb({"name": name, "id": value[name], "cached": true})
-    }else{
-      mojang.uuidAt(name,function (err, out) {
-        if (err){
-          console.log(err)
-          cb({"name":name, "id": md5(name), "cached": false});
-          uuidcache.set(name, md5(name));
-        }
-        else {
-          updatecaches(out.name, out.id)
-          cb({"name":name, "id": out.id, "cached": false})
-        }
-      });
+  if (uuids[name]){
+    if (((getTime() - uuids[name].updated) / 36e5) > 6)
+      getnewUUID(name, cb)
+    else
+      cb(uuids[name].id, true)
+  }
+  else{
+    getnewUUID(name, cb)
+  }
+}
+
+function getnewUUID(name, cb){
+  if (name.indexOf("[") > -1)
+    cb("41c82c877afb4024ba5713d2c99cae77")
+  mojang.uuidAt(name,function (err, out) {
+    if (err) {
+      console.log(err)
+      cb(uuids[name].id, true)
+    }
+    else {
+      uuids[name]={"updated":getTime(), "id":out.id}
+      cb(uuids[name].id, false)
     }
 
   })
 }
 
 function getName(uuid, cb){
-  namecache.get(uuid, function(err, value){
-    if (uuid in value ){
-      cb({"name": value[uuid], "id": uuid, "cached": true})
-    }else{
-      mojang.profile(uuid, function(err,out){
-        if  (err)
-          cb({"name":null, "id": uuid, "cached": false})
-        else{
-          cb({"name": out.name, "id": uuid, "cached": false})
-          updatecaches(out.name, out.id)
-        }
-      })
+  console.log(uuids)
+  for (key in uuids){
+    console.log(key)
+    if (uuid == uuids[key].id){
+      cb(key, true);
+      return;
+    }
+  }
+
+  mojang.profile(uuid,function (err, out) {
+    if (err) {
+      cb(null, false)
+    }
+    else {
+      uuids[out.name]={"updated":getTime(), "id":uuid}
+      cb(out.name, false)
     }
   });
 }
 
+function getTime(){
+  return new Date().getTime()
+}
+
 app.get('/uuid/:username', function(req, res, next) {
-  getUUID(req.params.username, function(out) {
-    res.json(out);
+  getUUID(req.params.username, function(uuid, cache) {
+    res.json({"name":req.params.username, "uuid":uuid, "cached":cache});
   });
 });
 
 app.get('/name/:uuid', function(req, res, next) {
-  getName(req.params.uuid, function(out) {
-    res.json(out);
+  getName(req.params.uuid, function(out,cache) {
+    res.json({"name":out, "uuid":req.params.uuid, "cached":cache});
   });
 });
 
 app.get('/', function(req, res, next) {
-    res.json({"uuidcache":{"data":uuidcache.data,"stats":uuidcache.getStats()}, "namecache":{"data":namecache.data,"stats":namecache.getStats()}})
+    res.json(uuids)
 });
 
 app.get('/clear', function(req, res, next) {
-  uuidcache.flushAll()
-  res.json({"uuidcache":{"data":uuidcache.data,"stats":uuidcache.getStats()}})
+  uuids = [];
+  res.json({"status":"cleared"})
 });
 
 
