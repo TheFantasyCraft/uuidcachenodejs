@@ -43,7 +43,10 @@ function getnewUUID(name, cb){
   mojang.uuidAt(name,function (err, out) {
     if (err) {
       console.log(err)
-      cb(uuids[name].id, true)
+      if (uuids[name])
+        cb(uuids[name].id, true)
+      else
+        cb(null, true)
     }
     else {
       uuids[name]={"updated":getTime(), "id":out.id}
