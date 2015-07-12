@@ -5,6 +5,7 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var mojang = require('mojang-api')
 domain = require('domain');
+var request = require('request');
 
 var app = express();
 
@@ -40,13 +41,13 @@ function getUUID(name, cb) {
 function getnewUUID(name, cb){
   if (name.indexOf("[") > -1)
     cb("41c82c877afb4024ba5713d2c99cae77")
+
   mojang.uuidAt(name,function (err, out) {
     if (err) {
-      console.log(err)
       if (uuids[name])
         cb(uuids[name].id, true)
       else
-        cb(null, true)
+        getfallback(name, cb, "uuid");
     }
     else {
       uuids[name]={"updated":getTime(), "id":out.id}
@@ -56,8 +57,26 @@ function getnewUUID(name, cb){
   })
 }
 
+function getfallback(uuidorname, cb, key) {
+  request("http://mcuuid.com/api/" + uuidorname, function (error, response, body) {
+    if (!error && response.statusCode == 200) {
+      keyvalue = JSON.parse(body)[key];
+      cb(keyvalue, false);
+      if (key == "name")
+        uuids[keyvalue]={"updated":getTime(), "id":uuidorname}
+      else
+        uuids[uuidorname]={"updated":getTime(), "id":keyvalue}
+      console.log("mojang blocked us, fallback using mcuuid.net")
+    }
+    else{
+      console.log(error)
+      cb(null, false)
+    }
+  });
+}
+
 function getName(uuid, cb){
-  console.log(uuids)
+
   for (key in uuids){
     console.log(key)
     if (uuid == uuids[key].id){
@@ -65,10 +84,9 @@ function getName(uuid, cb){
       return;
     }
   }
-
   mojang.profile(uuid,function (err, out) {
     if (err) {
-      cb(null, false)
+      getfallback(uuid, cb, "name");
     }
     else {
       uuids[out.name]={"updated":getTime(), "id":uuid}
