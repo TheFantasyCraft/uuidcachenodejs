@@ -43,7 +43,7 @@ function getnewUUID(name, cb){
     cb("41c82c877afb4024ba5713d2c99cae77")
 
   mojang.uuidAt(name,function (err, out) {
-    if (err) {
+    if (!err) {
       if (uuids[name])
         cb(uuids[name].id, true)
       else
@@ -58,9 +58,9 @@ function getnewUUID(name, cb){
 }
 
 function getfallback(uuidorname, cb, key) {
-  request("http://mcuuid.com/api/" + uuidorname, function (error, response, body) {
+  request("http://mcuuid.com/api/" + uuidorname + "/raw", function (error, response, body) {
     if (!error && response.statusCode == 200) {
-      keyvalue = JSON.parse(body)[key];
+      keyvalue = body;
       cb(keyvalue, false);
       if (key == "name")
         uuids[keyvalue]={"updated":getTime(), "id":uuidorname}
