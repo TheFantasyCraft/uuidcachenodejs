@@ -43,7 +43,7 @@ function getnewUUID(name, cb){
     cb("41c82c877afb4024ba5713d2c99cae77")
 
   mojang.uuidAt(name,function (err, out) {
-    if (!err) {
+    if (err) {
       if (uuids[name])
         cb(uuids[name].id, true)
       else
